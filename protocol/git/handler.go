@@ -430,7 +430,7 @@ func (h *Handler) handleUploadPack(w http.ResponseWriter, r *http.Request, repo 
 		closureRan = true
 		return h.fetchAndStorePack(dlCtx, repo, gitProtocol, bodyFile, bodyHash, cacheKey, logger)
 	})
-	if !closureRan {
+	if ctx.Err() == nil && !closureRan {
 		_ = bodyFile.Close()
 	}
 
