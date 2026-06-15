@@ -303,7 +303,7 @@ func (h *Handler) handleUploadPack(w http.ResponseWriter, r *http.Request, repo 
 		}
 		defer func() { _ = os.Remove(decompFile.Name()) }()
 
-		hr := contentcache.NewHashingReader(io.LimitReader(gz, h.maxDecompressedBodySize))
+		hr := contentcache.NewHashingReader(io.LimitReader(gz, h.maxDecompressedBodySize+1))
 		decompSize, copyErr := io.Copy(decompFile, hr)
 		_ = gz.Close()
 		_ = rawFile.Close()
@@ -313,7 +313,7 @@ func (h *Handler) handleUploadPack(w http.ResponseWriter, r *http.Request, repo 
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		if decompSize >= h.maxDecompressedBodySize {
+		if decompSize > h.maxDecompressedBodySize {
 			_ = decompFile.Close()
 			logger.Error("decompressed request body exceeds size limit", "limit", h.maxDecompressedBodySize)
 			http.Error(w, "decompressed request body too large", http.StatusRequestEntityTooLarge)
