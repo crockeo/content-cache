@@ -152,6 +152,22 @@ func (u *Upstream) FetchUploadPack(ctx context.Context, repo RepoRef, gitProtoco
 		return nil, fmt.Errorf("creating upload-pack request: %w", err)
 	}
 
+	if seeker, ok := body.(io.Seeker); ok {
+		if start, posErr := seeker.Seek(0, io.SeekCurrent); posErr == nil {
+			if end, endErr := seeker.Seek(0, io.SeekEnd); endErr == nil {
+				if _, restoreErr := seeker.Seek(start, io.SeekStart); restoreErr == nil {
+					req.ContentLength = end - start
+					req.GetBody = func() (io.ReadCloser, error) {
+						if _, seekErr := seeker.Seek(start, io.SeekStart); seekErr != nil {
+							return nil, seekErr
+						}
+						return io.NopCloser(body), nil
+					}
+				}
+			}
+		}
+	}
+
 	req.Header.Set("Content-Type", ContentTypeUploadPackRequest)
 	if gitProtocol != "" {
 		req.Header.Set("Git-Protocol", gitProtocol)
