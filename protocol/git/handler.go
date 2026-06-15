@@ -508,7 +508,7 @@ func (h *Handler) fetchAndStorePack(ctx context.Context, repo RepoRef, gitProtoc
 	// Update index
 	cached := &CachedPack{
 		RequestHash:  bodyHash,
-		ResponseHash: hash,
+		ResponseHash: storedHash,
 		ResponseSize: size,
 		Repo:         repo.String(),
 		GitProtocol:  gitProtocol,
@@ -517,10 +517,10 @@ func (h *Handler) fetchAndStorePack(ctx context.Context, repo RepoRef, gitProtoc
 	if err := h.index.PutCachedPack(ctx, cacheKey, cached); err != nil {
 		logger.Error("failed to update index", "error", err)
 	} else {
-		logger.Info("cached pack", "hash", hash.ShortString(), "size", size)
+		logger.Info("cached pack", "hash", storedHash.ShortString(), "size", size)
 	}
 
-	return &download.Result{Hash: hash, Size: size}, nil
+	return &download.Result{Hash: storedHash, Size: size}, nil
 }
 
 // logPktLineSummary logs a summary of the git pkt-line request body for debugging.
