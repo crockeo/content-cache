@@ -379,12 +379,14 @@ func (h *Handler) handleUploadPack(w http.ResponseWriter, r *http.Request, repo 
 	// Check cache
 	cached, err := h.index.GetCachedPack(ctx, cacheKey)
 	if err == nil {
-		// Verify the blob still exists in the store before serving
 		exists, storeErr := h.store.Has(ctx, cached.ResponseHash)
-		if storeErr != nil {
-			logger.Error("cache store check failed", "hash", cached.ResponseHash.ShortString(), "error", storeErr)
-		}
-		if exists {
+		switch {
+		case storeErr != nil:
+			logger.Error("cache store check failed, bypassing cache without evicting",
+				"hash", cached.ResponseHash.ShortString(),
+				"error", storeErr,
+			)
+		case exists:
 			upstream := h.router.Match(repo)
 			if err := upstream.checkAuth(ctx, repo); err != nil {
 				logger.Error("upstream auth failed for cached pack", "error", err)
@@ -402,14 +404,14 @@ func (h *Handler) handleUploadPack(w http.ResponseWriter, r *http.Request, repo 
 				Size: cached.ResponseSize,
 			}, download.ServeOptions{ContentType: ContentTypeUploadPackResult}, logger)
 			return
-		}
-		// Blob missing from store — evict stale index entry and fall through to upstream
-		logger.Warn("cache index references missing blob, evicting stale entry",
-			"hash", cached.ResponseHash.ShortString(),
-			"cache_key", cacheKey,
-		)
-		if delErr := h.index.DeleteCachedPack(ctx, cacheKey); delErr != nil {
-			logger.Error("failed to evict stale cache entry", "error", delErr)
+		default:
+			logger.Warn("cache index references missing blob, evicting stale entry",
+				"hash", cached.ResponseHash.ShortString(),
+				"cache_key", cacheKey,
+			)
+			if delErr := h.index.DeleteCachedPack(ctx, cacheKey); delErr != nil {
+				logger.Error("failed to evict stale cache entry", "error", delErr)
+			}
 		}
 	}
 	if err != nil && !errors.Is(err, ErrNotFound) {
